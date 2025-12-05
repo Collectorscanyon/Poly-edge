@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const anthropic = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ 
+  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+  dangerouslyAllowBrowser: true
+});
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 export const askPolyEdgeOracle = async (market, analysis) => {
