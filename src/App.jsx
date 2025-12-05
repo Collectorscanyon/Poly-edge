@@ -51,7 +51,10 @@ export default function App() {
         loginMethods: ['twitter', 'wallet'],
         embeddedWallets: { createOnLogin: true },
         appearance: { theme: 'dark' },
-        dangerouslyAllowBrowser: true
+        dangerouslyAllowBrowser: true,
+        twitter: {
+          scope: 'tweet.read users.read offline.access' // Required for 2025 Twitter OAuth
+        }
       }}
     >
       <AuthWrapper />
