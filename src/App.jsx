@@ -31,6 +31,8 @@ function Landing() {
 export default function App() {
   const appId = import.meta.env.VITE_PRIVY_APP_ID;
 
+  if (!appId) {
+    return <div className="text-red-500">Missing VITE_PRIVY_APP_ID</div>;
   // Safety: show helpful error if no Privy ID (only devs see this)
   if (!appId) {
     return (
@@ -51,6 +53,8 @@ export default function App() {
       config={{
         loginMethods: ['twitter', 'wallet'],
         embeddedWallets: { createOnLogin: true },
+        appearance: { theme: 'dark' },
+        dangerouslyAllowBrowser: true,
         appearance: { theme: 'dark' }
       }}
     >
@@ -62,4 +66,5 @@ export default function App() {
 function AuthWrapper() {
   const { authenticated } = usePrivy();
   return authenticated ? <PolyEdgeScanner /> : <Landing />;
+}
 }
