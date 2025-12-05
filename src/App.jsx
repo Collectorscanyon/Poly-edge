@@ -31,7 +31,7 @@ function Landing() {
 export default function App() {
   const appId = import.meta.env.VITE_PRIVY_APP_ID;
 
-  // Safety: show error if no Privy ID (only devs see this)
+  // Safety: show helpful error if no Privy ID (only devs see this)
   if (!appId) {
     return (
       <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center p-8">
