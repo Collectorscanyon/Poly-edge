@@ -1,69 +1,30 @@
-import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
-import PolyEdgeScanner from './PolyEdgeScanner.jsx';
-
-function Landing() {
-  const { login } = usePrivy();
-
-  return (
-    <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center p-8">
-      <div className="text-center max-w-2xl">
-        <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-          PolyEdge Scanner
-        </h1>
-        <p className="text-xl text-gray-300 mb-8">
-          The deadliest Polymarket edge scanner ever built.<br />
-          Real markets • AI oracle • 1-click copy trading via @bankrbot
-        </p>
-        <button
-          onClick={login}
-          className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-lg font-bold hover:shadow-2xl hover:shadow-purple-500/25 transition-all"
-        >
-          Login with X to Continue
-        </button>
-        <p className="text-sm text-gray-500 mt-8">
-          50 alpha spots @ $299/mo — DM “POLYEDGE” on X
-        </p>
-      </div>
-    </div>
-  );
-}
+import PolyEdgeScanner from './PolyEdgeScanner.jsx'
 
 export default function App() {
-  const appId = import.meta.env.VITE_PRIVY_APP_ID;
-
-  // Beautiful error if no Privy ID (only devs see this)
-  if (!appId) {
-    return (
-      <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center p-8">
-        <div className="text-center max-w-md bg-slate-900 rounded-2xl border border-red-500/30 p-8">
-          <h1 className="text-3xl font-bold mb-4 text-red-400">Privy App ID Missing</h1>
-          <p className="text-sm">
-            Add <code className="bg-slate-700 px-2 py-1 rounded">VITE_PRIVY_APP_ID</code> in Vercel → Settings → Environment Variables
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <PrivyProvider
-      appId={appId}
-      config={{
-        loginMethods: ['twitter', 'wallet'],
-        embeddedWallets: { createOnLogin: true },
-        appearance: { theme: 'dark' },
-        dangerouslyAllowBrowser: true, // Required for browser usage
-        twitter: {
-          scope: 'tweet.read users.read offline.access'
-        }
-      }}
-    >
-      <AuthWrapper />
-    </PrivyProvider>
-  );
-}
-
-function AuthWrapper() {
-  const { authenticated } = usePrivy();
-  return authenticated ? <PolyEdgeScanner /> : <Landing />;
+    <div className="min-h-screen bg-night text-slate-100">
+      <header className="sticky top-0 z-40 border-b border-white/5 bg-night/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-400/70 via-indigo-500/70 to-fuchsia-500/70 shadow-glass"></div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-emerald-300">PolyEdge</p>
+              <p className="text-xl font-semibold text-white">Scanner</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate-300">
+            <div className="pulse-dot flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-300 shadow-glass">
+              <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+              Live
+            </div>
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1 md:flex">
+              <span className="h-2 w-2 rounded-full bg-indigo-400"></span>
+              AI Oracle Dual-Stack
+            </div>
+          </div>
+        </div>
+      </header>
+      <PolyEdgeScanner />
+    </div>
+  )
 }
