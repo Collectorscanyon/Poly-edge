@@ -31,8 +31,18 @@ function Landing() {
 export default function App() {
   const appId = import.meta.env.VITE_PRIVY_APP_ID;
 
+  // Beautiful error if no Privy ID (only devs see this)
   if (!appId) {
-    return <div className="text-red-500">Missing VITE_PRIVY_APP_ID</div>;
+    return (
+      <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center p-8">
+        <div className="text-center max-w-md bg-slate-900 rounded-2xl border border-red-500/30 p-8">
+          <h1 className="text-3xl font-bold mb-4 text-red-400">Privy App ID Missing</h1>
+          <p className="text-sm">
+            Add <code className="bg-slate-700 px-2 py-1 rounded">VITE_PRIVY_APP_ID</code> in Vercel → Settings → Environment Variables
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -42,9 +52,9 @@ export default function App() {
         loginMethods: ['twitter', 'wallet'],
         embeddedWallets: { createOnLogin: true },
         appearance: { theme: 'dark' },
-        dangerouslyAllowBrowser: true,
+        dangerouslyAllowBrowser: true, // Required for browser usage
         twitter: {
-          scope: 'tweet.read users.read offline.access'  // FIXED: no "useres.read" typo
+          scope: 'tweet.read users.read offline.access'
         }
       }}
     >
