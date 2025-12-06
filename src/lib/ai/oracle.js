@@ -5,6 +5,9 @@ const anthropic = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
   dangerouslyAllowBrowser: true
 });
+  dangerouslyAllowBrowser: true  // REQUIRED for browser usage
+});
+
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 export const askPolyEdgeOracle = async (market, analysis) => {
@@ -30,6 +33,9 @@ Tags: ${analysis.tags.join(', ')}
     });
     claudeJson = JSON.parse(claudeRes.content[0].text);
   } catch (e) { console.log('Claude failed'); }
+  } catch (e) {
+    console.log('Claude failed:', e.message);
+  }
 
   try {
     const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
@@ -41,6 +47,17 @@ Tags: ${analysis.tags.join(', ')}
   const avgScore = votes.reduce((a, v) => a + (v.score || 0), 0) / votes.length || 0;
   const directionVotes = votes.reduce((acc, v) => { acc[v.direction || 'NO'] = (acc[v.direction || 'NO'] || 0) + 1; return acc; }, {});
   const winningDirection = Object.entries(directionVotes).sort((a, b) => b[1] - a[1])[0][0] || 'NO';
+  } catch (e) {
+    console.log('Gemini failed:', e.message);
+  }
+
+  const votes = [claudeJson, geminiJson].filter(Boolean);
+  const avgScore = votes.reduce((a, v) => a + (v.score || 0), 0) / votes.length || 0;
+  const directionVotes = votes.reduce((acc, v) => {
+    acc[v.direction || 'NO'] = (acc[v.direction || 'NO'] || 0) + 1;
+    return acc;
+  }, {});
+  const winningDirection = Object.entries(directionVotes).sort((a, b) => b[1] - a[1])[0]?.[0] || 'NO';
   const conviction = avgScore >= 9.2 ? 'NUCLEAR' : avgScore >= 8.5 ? 'HIGH' : avgScore >= 7.5 ? 'MEDIUM' : 'LOW';
   const confidenceScore = Math.round((votes.filter(v => v.direction === winningDirection).length / votes.length) * 100) || 0;
 
