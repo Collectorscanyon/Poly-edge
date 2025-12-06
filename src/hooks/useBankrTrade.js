@@ -1,38 +1,66 @@
-import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { useState } from 'react';
+import { useCallback, useState } from 'react'
+import { usePrivy } from '@privy-io/react-auth'
 
-export const useBankrTrade = () => {
-  const { ready, authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
-  const [loading, setLoading] = useState(false);
+export function useBankrTrade() {
+  const { ready, authenticated, login, user } = usePrivy()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  const copyEdgeViaBankr = async (market, size = 250) => {
-    if (!ready || !authenticated) {
-      login();
-      return;
-    }
+  const baseWallet = (() => {
+    if (!user) return null
+    const allWallets = [...(user.wallets || []), ...(user.linkedAccounts || [])]
+    return allWallets.find((w) => w.chainId === 'base:8453') || allWallets[0] || null
+  })()
 
-    const wallet = wallets.find(w => w.chainId === 'base:8453');
-    if (!wallet) return alert('Connect Base wallet');
+  const isBankrReady = ready && authenticated && !!baseWallet
 
-    setLoading(true);
-    try {
-      const intent = `@bankrbot buy $${size} ${market.outcome} shares on "${market.question}". Max slippage 0.5%.`;
-      const res = await fetch('https://api.bankr.bot/v1/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_BANKR_API_KEY}` },
-        body: JSON.stringify({ prompt: intent, wallet: wallet.address, chain: 'base' })
-      });
-      const data = await res.json();
-      if (data.hash) alert(`Copied! Tx: ${data.hash}`);
-      else alert('Trade failed — check Bankr');
-    } catch (e) {
-      alert('Bankr error — check console');
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const executeWithBankr = useCallback(
+    async (market, sizeUsd = 250) => {
+      setError(null)
 
-  return { copyEdgeViaBankr, loading, ready: ready && authenticated };
-};
+      if (!ready) {
+        throw new Error('Privy not ready yet')
+      }
+
+      if (!authenticated) {
+        await login()
+        return
+      }
+
+      if (!baseWallet) {
+        throw new Error('No Base wallet found in Privy')
+      }
+
+      const intent = `@bankrbot buy $${sizeUsd} YES shares on "${market.question}" Max slippage 0.5%.`
+
+      setLoading(true)
+      try {
+        const res = await fetch('https://api.bankr.bot/v1/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: intent,
+            wallet: baseWallet.address,
+            chain: 'base'
+          })
+        })
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '')
+          throw new Error(`Bankr API error ${res.status}: ${txt}`)
+        }
+
+        return await res.json()
+      } catch (err) {
+        console.error('Bankr execution failed:', err)
+        setError(err)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [ready, authenticated, baseWallet, login]
+  )
+
+  return { executeWithBankr, isBankrReady, loading, error }
+}
