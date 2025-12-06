@@ -37,7 +37,7 @@ export default function PolyEdgeScanner() {
 
   const fetchMarkets = async () => {
     try {
-      const res = await fetch('/api/gamma?active=true&limit=200')
+      const res = await fetch('/api/gamma?limit=200')
       if (!res.ok) throw new Error()
       const data = await res.json()
       const processed = (data || []).map((m) => {
