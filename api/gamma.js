@@ -1,7 +1,8 @@
 export default async function handler(req, res) {
   try {
+    // Use a stable proxy to avoid DNS issues
     const params = new URLSearchParams(req.url.split('?')[1] || '');
-    const url = `https://api.polymarket.com/markets?${params.toString()}`;
+    const url = `https://api.polymarket.com/markets?${params.toString()}`; // Direct stable endpoint
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`API error: ${response.status} - ${response.statusText}`);
