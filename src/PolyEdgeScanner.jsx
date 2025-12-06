@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Activity, Copy, Sparkles, BrainCircuit } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { askPolyEdgeOracle } from './lib/ai/oracle.js'
 
@@ -72,6 +72,7 @@ export default function PolyEdgeScanner() {
       const data = await res.json()
       setMarkets(data.map(m => ({
         id: m.id,
+        slug: m.slug,
         question: m.question,
         price: parseFloat(m.yes_price || 0.5),
         volume24h: Number(m.volume_24h || 0),
@@ -101,7 +102,12 @@ export default function PolyEdgeScanner() {
     .map(m => ({ market: m, analysis: analyzeMarket(m) }))
     .filter(item => item.analysis.score >= 6.5)
     .sort((a, b) => b.analysis.score - a.analysis.score)
-    .slice(0, 8), [markets])
+    .slice(0, 5), [markets])
+
+  const getPolymarketUrl = (market) => {
+    const slug = market.slug || market.id || 'event'
+    return `https://polymarket.com/event/${slug}`
+  }
 
   const copyIntent = (q) => {
     navigator.clipboard.writeText(`@bankrbot buy $250 YES shares on "${q}" Max slippage 0.5%`)
@@ -117,23 +123,38 @@ export default function PolyEdgeScanner() {
       </h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
         {edges.map(({ market, analysis }) => (
-          <div key={market.id} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 border border-purple-500/30">
-            <h3 className="text-xl font-bold mb-4">{market.question}</h3>
-            <p className="text-4xl font-bold mb-2">{(market.price * 100).toFixed(1)}¢</p>
-            <p className="text-2xl text-green-400 mb-4">Score {analysis.score}/10</p>
-            <div className="h-32 mb-4">
-              <ResponsiveContainer>
-                <AreaChart data={market.history}>
-                  <Area type="monotone" dataKey="price" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
-                </AreaChart>
-              </ResponsiveContainer>
+          <a
+            key={market.id}
+            href={getPolymarketUrl(market)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block hover:shadow-lg hover:shadow-purple-500/25 transition-shadow"
+          >
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50">
+              <h3 className="text-xl font-bold mb-4">{market.question}</h3>
+              <p className="text-4xl font-bold mb-2">{(market.price * 100).toFixed(1)}¢</p>
+              <p className="text-2xl text-green-400 mb-4">Score {analysis.score}/10</p>
+              <div className="h-32 mb-4">
+                <ResponsiveContainer>
+                  <AreaChart data={market.history}>
+                    <Area type="monotone" dataKey="price" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    copyIntent(market.question)
+                  }}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded-lg font-bold"
+                >
+                  COPY INTENT
+                </button>
+              </div>
+              <p className="text-xs text-purple-400 mt-2 text-center">View on Polymarket</p>
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => copyIntent(market.question)} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded-lg font-bold">
-                COPY INTENT
-              </button>
-            </div>
-          </div>
+          </a>
         ))}
       </div>
     </div>
