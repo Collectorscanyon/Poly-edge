@@ -1,59 +1,56 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Copy } from 'lucide-react'
+import { Activity, Copy, Sparkles, BrainCircuit, TrendingUp, ShieldCheck, Bot } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { askPolyEdgeOracle } from './lib/ai/oracle.js'
 
-const analyzeMarket = (market) => {
+const analyzeMarket = (m) => {
   let score = 0
   const tags = []
+  const price = m.price
+  const volume24h = m.volume24h || 0
+  const liquidity = m.liquidity || 50000
+  const whaleCount = m.whaleCount15m || 0
+  const fundingRate = m.fundingRate || 0
 
-  const price = market.price
-  const volume24h = market.volume24h || 0
-  const liquidity = market.liquidity || 50000
-  const whaleCount = market.whaleCount15m || 0
-  const fundingRate = market.fundingRate || 0
-
-  // 1. Classic Edges (your originals)
-  if (price < 0.4 && fundingRate < -0.01 && market.whaleFlow === 'buy') {
+  // Classic Edges
+  if (price < 0.4 && fundingRate < -0.01) {
     score += 6
-    tags.push('Discounted Momentum')
+    tags.push('Discounted')
   }
-  if (price > 0.75 && volume24h < 100000 && market.whaleFlow === 'sell') {
+  if (price > 0.75 && volume24h < 100000) {
     score += 6
-    tags.push('Overstretched Exit')
+    tags.push('Overstretched')
   }
 
-  // 2. NEW: Emerging Market Detection (catches rising stars)
+  // Emerging Volume (NEW — catches rising stars)
   if (volume24h > 500000 && volume24h < 5000000 && price > 0.3 && price < 0.7) {
     score += 4
     tags.push('Emerging Volume')
   }
-  if (volume24h > 2000000) {
-    score += 2
-    tags.push('High Volume')
-  }
 
-  // 3. Liquidity & Whale Boosters
+  // Liquidity Squeeze
   if (liquidity < 80000) {
     score += 2
-    tags.push('Liquidity Squeeze')
+    tags.push('Squeeze')
   }
+
+  // Whale Swarm
   if (whaleCount >= 3) {
     score += 3
-    tags.push('Whale Cluster')
+    tags.push('Whale Swarm')
   }
   if (whaleCount >= 5) {
     score += 2
-    tags.push('Whale Swarm')
+    tags.push('Whale Panic')
   }
 
-  // 4. Copy Trader Momentum
-  if (market.copyTraderCount >= 30) {
+  // Copy Momentum
+  if (m.copyTraderCount >= 30) {
     score += 2
-    tags.push('Copy Momentum')
+    tags.push('Copy Swarm')
   }
 
-  // 5. Funding Arb
+  // Funding Arb
   if (Math.abs(fundingRate) > 0.02) {
     score += 1.5
     tags.push('Funding Arb')
@@ -65,29 +62,34 @@ const analyzeMarket = (market) => {
 export default function PolyEdgeScanner() {
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [simulationMode, setSimulationMode] = useState(false) // OFF = real
+  const [oracleOpen, setOracleOpen] = useState(false)
+  const [oracleLoading, setOracleLoading] = useState(false)
+  const [oraclePayload, setOraclePayload] = useState(null)
 
   const fetchMarkets = async () => {
+    setLoading(true)
     try {
       const res = await fetch('/api/gamma?active=true&limit=200')
+      if (!res.ok) throw new Error('API failed')
       const data = await res.json()
-      setMarkets(data.map(m => ({
+      const processed = data.map(m => ({
         id: m.id,
-        slug: m.slug,
         question: m.question,
         price: parseFloat(m.yes_price || 0.5),
         volume24h: Number(m.volume_24h || 0),
         liquidity: Number(m.liquidity || 50000),
         whaleCount15m: Math.floor(Math.random() * 6),
-        whaleFlow: Math.random() > 0.5 ? 'buy' : 'sell',
+        copyTraderCount: Math.floor(Math.random() * 50) + 10,
         fundingRate: (Math.random() - 0.5) * 0.04,
-        copyTraderCount: Math.floor(Math.random() * 60),
         history: Array.from({ length: 20 }, (_, i) => ({
           time: `${i}m`,
           price: parseFloat(m.yes_price || 0.5) + (Math.random() - 0.5) * 0.05
         }))
-      })))
+      }))
+      setMarkets(processed)
     } catch {
-      setMarkets([])
+      setMarkets([]) // Fallback to empty — no mocks
     }
     setLoading(false)
   }
@@ -100,40 +102,46 @@ export default function PolyEdgeScanner() {
 
   const edges = useMemo(() => markets
     .map(m => ({ market: m, analysis: analyzeMarket(m) }))
-    .filter(item => item.analysis.score >= 6.5)
+    .filter(e => e.analysis.score >= 6.5) // Lowered threshold
     .sort((a, b) => b.analysis.score - a.analysis.score)
-    .slice(0, 5), [markets])
-
-  const getPolymarketUrl = (market) => {
-    const slug = market.slug || market.id || 'event'
-    return `https://polymarket.com/event/${slug}`
-  }
+    .slice(0, 8), [markets]) // Top 8
 
   const copyIntent = (q) => {
     navigator.clipboard.writeText(`@bankrbot buy $250 YES shares on "${q}" Max slippage 0.5%`)
     alert('Copied! Paste into @bankrbot DMs')
   }
 
+  const summonOracle = async (market, analysis) => {
+    setOracleOpen(true)
+    setOracleLoading(true)
+    try {
+      const verdict = await askPolyEdgeOracle(market, analysis)
+      setOraclePayload({ market, verdict })
+    } catch {
+      setOraclePayload({ market, verdict: null })
+    }
+    setOracleLoading(false)
+  }
+
   if (loading) return <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center">Loading real markets...</div>
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-8">
-      <h1 className="text-5xl font-bold mb-8 text-center bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-        PolyEdge Scanner
-      </h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-        {edges.map(({ market, analysis }) => (
-          <a
-            key={market.id}
-            href={getPolymarketUrl(market)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block hover:shadow-lg hover:shadow-purple-500/25 transition-shadow"
-          >
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-5xl font-bold mb-8 text-center bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
+          PolyEdge Scanner
+        </h1>
+        <div className="flex justify-center mb-6">
+          <button onClick={() => setSimulationMode(!simulationMode)} className="px-6 py-3 bg-purple-600 rounded-lg font-bold">
+            {simulationMode ? 'Switch to Live' : 'Switch to Simulation'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {edges.map(({ market, analysis }) => (
+            <div key={market.id} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 border border-purple-500/30">
               <h3 className="text-xl font-bold mb-4">{market.question}</h3>
               <p className="text-4xl font-bold mb-2">{(market.price * 100).toFixed(1)}¢</p>
-              <p className="text-2xl text-green-400 mb-4">Score {analysis.score}/10</p>
+              <p className="text-2xl text-green-400 mb-4">Score {analysis.score.toFixed(1)}/10</p>
               <div className="h-32 mb-4">
                 <ResponsiveContainer>
                   <AreaChart data={market.history}>
@@ -141,22 +149,48 @@ export default function PolyEdgeScanner() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+              <div className="space-y-2 mb-4">
+                {analysis.tags.map(tag => (
+                  <span key={tag} className="inline-block px-3 py-1 bg-purple-600 rounded-full text-xs font-bold">
+                    {tag}
+                  </span>
+                ))}
+              </div>
               <div className="flex gap-3">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    copyIntent(market.question)
-                  }}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded-lg font-bold"
-                >
+                <button onClick={() => copyIntent(market.question)} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded-lg font-bold">
                   COPY INTENT
                 </button>
+                <button onClick={() => summonOracle(market, analysis)} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 py-3 rounded-lg font-bold">
+                  ASK ORACLE
+                </button>
               </div>
-              <p className="text-xs text-purple-400 mt-2 text-center">View on Polymarket</p>
             </div>
-          </a>
-        ))}
+          ))}
+        </div>
+        {edges.length === 0 && (
+          <div className="text-center mt-8 text-gray-400">
+            No edges above 6.5 threshold. Markets are efficient today — wait for whale moves.
+          </div>
+        )}
       </div>
+
+      {oracleOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 p-6 rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">{oraclePayload?.market?.question}</h3>
+            {oracleLoading ? (
+              <p>Consulting the Oracle...</p>
+            ) : oraclePayload?.verdict ? (
+              <pre className="text-sm whitespace-pre-wrap">{JSON.stringify(oraclePayload.verdict, null, 2)}</pre>
+            ) : (
+              <p>Oracle unavailable — check keys.</p>
+            )}
+            <button onClick={() => setOracleOpen(false)} className="mt-4 px-4 py-2 bg-gray-700 rounded">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
