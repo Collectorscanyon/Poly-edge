@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy from '@privy-io/react-auth';
 import {
   Activity, TrendingUp, TrendingDown, Users, AlertTriangle, Search, Menu, X, Star, Settings, ArrowRight, ExternalLink, Shield, Zap, BarChart3, Copy, Bell, Sparkles, BrainCircuit, Bot
 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { askPolyEdgeOracle } from './lib/ai/oracle.js';
+import { useBankrTrade } from './hooks/useBankrTrade.js';
 
 // Mock data for fallback
 const generateMockMarkets = () => [
@@ -21,48 +22,27 @@ const generateMockMarkets = () => [
     recentWhaleAction: 'buy_yes',
     history: Array.from({ length: 20 }, (_, i) => ({ time: `${i}m`, price: 0.35 + Math.random() * 0.05 }))
   },
-  // Add 4 more mocks as per your original
+  // ... your other 4 mocks
 ];
 
 const analyzeMarket = (market) => {
-  let score = 0;
-  const tags = [];
-  let direction = 'YES';
-  let rewardRisk = 0;
-
-  if (market.price < 0.4) {
-    if (market.fundingRate < 0) score += 3;
-    if (market.recentWhaleAction === 'buy_yes') score += 3;
-    if (market.liquidity < 80000) { score += 2; tags.push('LIQUIDITY SQUEEZE'); }
-    if (market.whaleCount15m >= 2) { score += 2; tags.push('WHALE CLUSTER'); }
-    direction = 'YES';
-    rewardRisk = (0.9 - market.price) / (market.price * 0.5);
-  } else if (market.price > 0.75) {
-    if (market.volume24h < 100000) score += 2;
-    if (market.recentWhaleAction === 'buy_no' || market.recentWhaleAction === 'sell_yes') score += 4;
-    if (market.fundingRate > 0.08) { score += 2; tags.push('FUNDING ARB'); }
-    direction = 'NO';
-    rewardRisk = (market.price - 0.1) / (1 - market.price);
-  } else {
-    score = 2;
-  }
-
-  if (market.whaleCount15m >= 3 && score < 8) { direction = 'SHADOW_WHALE'; score = 7.5; tags.push('SHADOW FOLLOW'); }
-  if (market.copyTraderCount20m > 12) { tags.push('COPY CLUSTER'); if (score > 5) score += 1; }
-  if (score > 10) score = 10;
-
-  return { marketId: market.id, score, direction, reason: tags, rewardRisk: parseFloat(rewardRisk.toFixed(2)), tags };
+  // ... your existing analyzeMarket function
 };
 
 export default function PolyEdgeScanner() {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [markets, setMarkets] = useState([]);
   const [analyses, setAnalyses] = useState({});
   const [loading, setLoading] = useState(true);
-  const [simulationMode, setSimulationMode] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [simulationMode, setSimulationMode] = useState(false); // OFF = real data
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiContent, setAiContent] = useState('');
-  const [aiTitle, setAiTitle] = useState('');
+
+  const { login, authenticated } = usePrivy();
+  const { copyEdgeViaBankr, loading: bankrLoading, ready: isBankrReady } = useBankrTrade();
 
   const refreshData = async () => {
     setLoading(true);
@@ -81,7 +61,10 @@ export default function PolyEdgeScanner() {
           whaleCount15m: Math.floor(Math.random() * 5),
           copyTraderCount20m: Math.floor(Math.random() * 30),
           recentWhaleAction: ['buy_yes', 'buy_no', 'neutral'][Math.floor(Math.random() * 3)],
-          history: Array.from({ length: 20 }, (_, i) => ({ time: `${i}m`, price: parseFloat(m.yes_price || 0.5) + (Math.random() - 0.5) * 0.03 }))
+          history: Array.from({ length: 20 }, (_, i) => ({
+            time: `${i}m`,
+            price: parseFloat(m.yes_price || 0.5) + (Math.random() - 0.5) * 0.03
+          }))
         }));
       } else {
         newMarkets = generateMockMarkets();
@@ -99,6 +82,7 @@ export default function PolyEdgeScanner() {
       setMarkets(mock);
       setAnalyses(newAnalyses);
     }
+    setLastUpdated(new Date());
     setLoading(false);
   };
 
@@ -128,18 +112,7 @@ export default function PolyEdgeScanner() {
     setAiLoading(false);
   };
 
-  const copyIntentToClipboard = async (market) => {
-    const intent = `@bankrbot buy $250 ${market.outcome || 'YES'} shares on "${market.question}". Max slippage 0.5%.`;
-    try {
-      await navigator.clipboard.writeText(intent);
-      alert('Copied trade intent. Paste into @bankrbot DMs.');
-    } catch (error) {
-      console.error('Clipboard copy failed', error);
-      alert(intent);
-    }
-  };
-
-  if (loading) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center">Loading edges...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-white">Loading edges...</div>;
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-slate-100">
@@ -147,6 +120,9 @@ export default function PolyEdgeScanner() {
       <header className="fixed top-0 left-0 right-0 h-16 bg-[#0a0b14]/80 backdrop-blur-md border-b border-slate-800 z-50 flex items-center justify-between px-4">
         <h1 className="text-xl font-bold">PolyEdge Scanner</h1>
         <div className="flex gap-4">
+          <button onClick={login} disabled={authenticated} className="px-4 py-2 bg-blue-600 rounded">
+            {authenticated ? 'Connected' : 'Login with X'}
+          </button>
           <button onClick={() => setSimulationMode(!simulationMode)} className="px-4 py-2 bg-purple-600 rounded">
             {simulationMode ? 'Live Data' : 'Simulation'}
           </button>
@@ -173,8 +149,8 @@ export default function PolyEdgeScanner() {
                 <button onClick={() => handleOracleAnalysis(market, analysis)} className="flex-1 px-4 py-2 bg-purple-600 rounded">
                   Ask Oracle
                 </button>
-                <button onClick={() => copyIntentToClipboard(market)} className="flex-1 px-4 py-2 bg-pink-600 rounded">
-                  Copy Bankr Intent
+                <button onClick={() => copyEdgeViaBankr(market, 250)} disabled={!isBankrReady || bankrLoading} className="flex-1 px-4 py-2 bg-pink-600 rounded disabled:opacity-50">
+                  {bankrLoading ? 'Executing...' : isBankrReady ? 'Copy Trade' : 'Login First'}
                 </button>
               </div>
             </div>
@@ -185,15 +161,4 @@ export default function PolyEdgeScanner() {
       {/* AI Modal */}
       {aiModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800 p-6 rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">{aiTitle}</h3>
-            <pre className="text-sm whitespace-pre-wrap">{aiContent}</pre>
-            <button onClick={() => setAiModalOpen(false)} className="mt-4 px-4 py-2 bg-slate-600 rounded">
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+          <div className="bg-slate-800 p-6 rounded-lg max-w-lg w-full
