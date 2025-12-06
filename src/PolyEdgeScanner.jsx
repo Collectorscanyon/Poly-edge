@@ -3,13 +3,62 @@ import { Activity, Copy, Sparkles, BrainCircuit } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { askPolyEdgeOracle } from './lib/ai/oracle.js'
 
-const analyzeMarket = (m) => {
+const analyzeMarket = (market) => {
   let score = 0
   const tags = []
-  if (m.price < 0.4) score += 6
-  if (m.price > 0.75) score += 6
-  if (m.liquidity < 80000) { score += 2; tags.push('LIQUIDITY SQUEEZE') }
-  if (m.whaleCount15m >= 3) { score += 2; tags.push('WHALE CLUSTER') }
+
+  const price = market.price
+  const volume24h = market.volume24h || 0
+  const liquidity = market.liquidity || 50000
+  const whaleCount = market.whaleCount15m || 0
+  const fundingRate = market.fundingRate || 0
+
+  // 1. Classic Edges (your originals)
+  if (price < 0.4 && fundingRate < -0.01 && market.whaleFlow === 'buy') {
+    score += 6
+    tags.push('Discounted Momentum')
+  }
+  if (price > 0.75 && volume24h < 100000 && market.whaleFlow === 'sell') {
+    score += 6
+    tags.push('Overstretched Exit')
+  }
+
+  // 2. NEW: Emerging Market Detection (catches rising stars)
+  if (volume24h > 500000 && volume24h < 5000000 && price > 0.3 && price < 0.7) {
+    score += 4
+    tags.push('Emerging Volume')
+  }
+  if (volume24h > 2000000) {
+    score += 2
+    tags.push('High Volume')
+  }
+
+  // 3. Liquidity & Whale Boosters
+  if (liquidity < 80000) {
+    score += 2
+    tags.push('Liquidity Squeeze')
+  }
+  if (whaleCount >= 3) {
+    score += 3
+    tags.push('Whale Cluster')
+  }
+  if (whaleCount >= 5) {
+    score += 2
+    tags.push('Whale Swarm')
+  }
+
+  // 4. Copy Trader Momentum
+  if (market.copyTraderCount >= 30) {
+    score += 2
+    tags.push('Copy Momentum')
+  }
+
+  // 5. Funding Arb
+  if (Math.abs(fundingRate) > 0.02) {
+    score += 1.5
+    tags.push('Funding Arb')
+  }
+
   return { score: Math.min(score, 10), tags }
 }
 
@@ -28,6 +77,9 @@ export default function PolyEdgeScanner() {
         volume24h: Number(m.volume_24h || 0),
         liquidity: Number(m.liquidity || 50000),
         whaleCount15m: Math.floor(Math.random() * 6),
+        whaleFlow: Math.random() > 0.5 ? 'buy' : 'sell',
+        fundingRate: (Math.random() - 0.5) * 0.04,
+        copyTraderCount: Math.floor(Math.random() * 60),
         history: Array.from({ length: 20 }, (_, i) => ({
           time: `${i}m`,
           price: parseFloat(m.yes_price || 0.5) + (Math.random() - 0.5) * 0.05
@@ -47,9 +99,9 @@ export default function PolyEdgeScanner() {
 
   const edges = useMemo(() => markets
     .map(m => ({ market: m, analysis: analyzeMarket(m) }))
-    .filter(e => e.analysis.score >= 7.5)
+    .filter(item => item.analysis.score >= 6.5)
     .sort((a, b) => b.analysis.score - a.analysis.score)
-    .slice(0, 5), [markets])
+    .slice(0, 8), [markets])
 
   const copyIntent = (q) => {
     navigator.clipboard.writeText(`@bankrbot buy $250 YES shares on "${q}" Max slippage 0.5%`)
