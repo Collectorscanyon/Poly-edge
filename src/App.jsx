@@ -1,7 +1,25 @@
+import { PrivyProvider } from '@privy-io/react-auth';
 import PolyEdgeScanner from './PolyEdgeScanner.jsx'
 
 export default function App() {
+  const appId = import.meta.env.VITE_PRIVY_APP_ID || '';
+
   return (
+    <PrivyProvider
+      appId={appId}
+      config={{
+        loginMethods: ['twitter', 'wallet'],
+        embeddedWallets: { createOnLogin: true },
+        appearance: { theme: 'dark' },
+        twitter: {
+          authorizationParams: {
+            url: 'https://x.com/i/oauth2/authorize',
+            response_type: 'code',
+            scope: 'tweet.read users.read offline.access'
+          }
+        }
+      }}
+    >
     <div className="min-h-screen bg-night text-slate-100">
       <header className="sticky top-0 z-40 border-b border-white/5 bg-night/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
@@ -69,5 +87,6 @@ export default function App() {
       </section>
       <PolyEdgeScanner />
     </div>
+      </PrivyProvider>
   )
 }
