@@ -96,9 +96,7 @@ const analyzeMarket = (market) => {
     score += 1
     tags.push('COPY CLUSTER')
   }
-  const result = { score: Math.min(score, 10), tags }
-  console.debug('Analyzing market', market.question, 'score', result.score, 'tags', result.tags)
-  return result
+  return { score: Math.min(score, 10), tags }
 }
 
 const metricPill = (label, value, accent) => (
@@ -112,7 +110,6 @@ const metricPill = (label, value, accent) => (
 const formatUsd = (num) => `$${Number(num || 0).toLocaleString()}`
 
 export default function PolyEdgeScanner() {
-  const useRealDataEnv = import.meta.env.VITE_USE_REAL_DATA === 'true'
   const [simulationMode, setSimulationMode] = useState(false)
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -125,12 +122,9 @@ export default function PolyEdgeScanner() {
   const fetchMarkets = async () => {
     setLoading(true)
     try {
-      const shouldUseLive = useRealDataEnv || !simulationMode
-      const source = shouldUseLive ? await fetchLive() : generateMockMarkets()
+      const source = simulationMode ? generateMockMarkets() : await fetchLive()
       setMarkets(source)
-      console.info(`Loaded ${source.length} ${shouldUseLive ? 'live' : 'simulated'} markets`)
-    } catch (error) {
-      console.error('Market fetch failed, using simulation fallback:', error.message)
+    } catch {
       setMarkets(generateMockMarkets())
     }
     setLastUpdated(new Date())
@@ -169,7 +163,7 @@ export default function PolyEdgeScanner() {
     fetchMarkets()
     const interval = setInterval(fetchMarkets, 60000)
     return () => clearInterval(interval)
-  }, [simulationMode, useRealDataEnv])
+  }, [simulationMode])
 
   const edges = useMemo(() => markets
     .map((market) => ({ market, analysis: analyzeMarket(market) }))
@@ -229,28 +223,24 @@ export default function PolyEdgeScanner() {
                 <Gauge className="h-4 w-4 text-emerald-300" />
                 Live Data
               </div>
-                <button
-                  onClick={() => setSimulationMode(false)}
-                  disabled={useRealDataEnv}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${!simulationMode ? 'bg-emerald-500 text-night' : 'bg-white/5 text-slate-200'} ${useRealDataEnv ? 'opacity-70' : ''}`}
-                  title={useRealDataEnv ? 'Live data enforced via env' : ''}
-                >
-                  Real
-                </button>
+              <button
+                onClick={() => setSimulationMode(false)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${!simulationMode ? 'bg-emerald-500 text-night' : 'bg-white/5 text-slate-200'}`}
+              >
+                Real
+              </button>
             </div>
             <div className="mt-4 flex items-center justify-between text-sm text-slate-200">
               <div className="flex items-center gap-2">
                 <Hourglass className="h-4 w-4 text-indigo-300" />
                 Simulation
               </div>
-                <button
-                  onClick={() => setSimulationMode(true)}
-                  disabled={useRealDataEnv}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${simulationMode ? 'bg-indigo-500 text-night' : 'bg-white/5 text-slate-200'} ${useRealDataEnv ? 'opacity-70' : ''}`}
-                  title={useRealDataEnv ? 'Live data enforced via env' : ''}
-                >
-                  Sim
-                </button>
+              <button
+                onClick={() => setSimulationMode(true)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${simulationMode ? 'bg-indigo-500 text-night' : 'bg-white/5 text-slate-200'}`}
+              >
+                Sim
+              </button>
             </div>
             <div className="mt-5 rounded-xl border border-white/5 bg-white/5 p-3 text-xs text-slate-300">
               <div className="flex items-center justify-between">
