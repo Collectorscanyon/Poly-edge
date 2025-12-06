@@ -31,19 +31,23 @@ const analyzeMarket = (m) => {
 export default function PolyEdgeScanner() {
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [oracleOpen, setOracleOpen] = useState(false)
   const [oracleLoading, setOracleLoading] = useState(false)
   const [oraclePayload, setOraclePayload] = useState(null)
 
   const fetchMarkets = async () => {
     try {
-      const res = await fetch('/api/gamma?limit=200')
-      if (!res.ok) throw new Error()
+      setError('')
+      const res = await fetch(
+        '/api/gamma?closed=false&order=id&ascending=false&limit=200'
+      )
+      if (!res.ok) throw new Error(`Upstream error ${res.status}`)
       const data = await res.json()
-      const processed = (data || []).map((m) => {
-        const price = parseFloat(m.yes_price ?? m.price ?? 0.5)
+      const processed = (Array.isArray(data) ? data : []).map((m) => {
+        const price = Number(m.yes_price ?? m.price ?? 0.5)
         const volume24h = Number(m.volume_24h ?? m.volume24h ?? 0)
-        const liquidity = Number(m.liquidity ?? 0)
+        const liquidity = Number(m.liquidity ?? m.liquidity_in ?? 0)
         const historyBase = price || 0.5
         return {
           ...m,
@@ -58,7 +62,9 @@ export default function PolyEdgeScanner() {
         }
       })
       setMarkets(processed)
-    } catch {
+    } catch (err) {
+      console.error('Real market fetch failed', err)
+      setError('Live market fetch failed — showing no edges until it recovers.')
       setMarkets([])
     }
     setLoading(false)
@@ -102,7 +108,7 @@ export default function PolyEdgeScanner() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
         {edges.length === 0 ? (
           <div className="col-span-full text-center text-gray-400 text-xl">
-            No edges right now — markets are efficient. Waiting for whale moves...
+            {error || 'No edges right now — markets are efficient. Waiting for whale moves...'}
           </div>
         ) : (
           edges.map(({ market, analysis }) => (
@@ -115,7 +121,7 @@ export default function PolyEdgeScanner() {
             >
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xl font-bold">{market.question}</h3>
+                  <h3 className="text-xl font-bold line-clamp-2 leading-snug">{market.question}</h3>
                   <Sparkles className="h-5 w-5 text-purple-300" />
                 </div>
                 <p className="text-4xl font-bold mb-2">{(market.price * 100).toFixed(1)}¢</p>
