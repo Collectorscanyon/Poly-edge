@@ -1,14 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, Bot, BrainCircuit, Copy, Flame, Gauge, Hourglass, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react'
+import {
+  Activity,
+  ArrowUpRight,
+  Bot,
+  BrainCircuit,
+  Copy,
+  Flame,
+  Gauge,
+  Hourglass,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+} from 'lucide-react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { askPolyEdgeOracle } from './lib/ai/oracle.js'
 
-const gradientStops = ['from-emerald-400/70 via-indigo-500/70 to-fuchsia-500/70', 'from-cyan-400/70 via-blue-500/70 to-purple-500/70', 'from-amber-400/70 via-orange-500/70 to-rose-500/70']
+const gradientStops = [
+  'from-emerald-400/70 via-indigo-500/70 to-fuchsia-500/70',
+  'from-cyan-400/70 via-blue-500/70 to-purple-500/70',
+  'from-amber-400/70 via-orange-500/70 to-rose-500/70',
+]
 
-const mockHistory = (base) => Array.from({ length: 28 }, (_, i) => ({
-  time: `${(27 - i) * 5}m`,
-  price: Number((base + (Math.random() - 0.5) * 0.08).toFixed(3))
-}))
+const mockHistory = (base) =>
+  Array.from({ length: 28 }, (_, i) => ({
+    time: `${(27 - i) * 5}m`,
+    price: Number((base + (Math.random() - 0.5) * 0.08).toFixed(3)),
+  }))
 
 const generateMockMarkets = () => [
   {
@@ -21,7 +38,7 @@ const generateMockMarkets = () => [
     whaleFlow: 'buy',
     whaleCount15m: 4,
     copyTraderCount: 28,
-    history: mockHistory(0.36)
+    history: mockHistory(0.36),
   },
   {
     id: 'mock-2',
@@ -33,7 +50,7 @@ const generateMockMarkets = () => [
     whaleFlow: 'sell',
     whaleCount15m: 3,
     copyTraderCount: 9,
-    history: mockHistory(0.82)
+    history: mockHistory(0.82),
   },
   {
     id: 'mock-3',
@@ -45,7 +62,7 @@ const generateMockMarkets = () => [
     whaleFlow: 'buy',
     whaleCount15m: 2,
     copyTraderCount: 34,
-    history: mockHistory(0.61)
+    history: mockHistory(0.61),
   },
   {
     id: 'mock-4',
@@ -57,7 +74,7 @@ const generateMockMarkets = () => [
     whaleFlow: 'buy',
     whaleCount15m: 3,
     copyTraderCount: 21,
-    history: mockHistory(0.29)
+    history: mockHistory(0.29),
   },
   {
     id: 'mock-5',
@@ -69,13 +86,14 @@ const generateMockMarkets = () => [
     whaleFlow: 'sell',
     whaleCount15m: 4,
     copyTraderCount: 24,
-    history: mockHistory(0.77)
-  }
+    history: mockHistory(0.77),
+  },
 ]
 
 const analyzeMarket = (market) => {
   let score = 0
   const tags = []
+
   if (market.price < 0.4 && market.fundingRate < 0 && market.whaleFlow === 'buy') {
     score += 6
     tags.push('Discounted momentum')
@@ -96,7 +114,10 @@ const analyzeMarket = (market) => {
     score += 1
     tags.push('COPY CLUSTER')
   }
-  return { score: Math.min(score, 10), tags }
+
+  const result = { score: Math.min(score, 10), tags }
+  console.debug('Analyzing market', market.question, 'score', result.score, 'tags', result.tags)
+  return result
 }
 
 const metricPill = (label, value, accent) => (
@@ -110,6 +131,9 @@ const metricPill = (label, value, accent) => (
 const formatUsd = (num) => `$${Number(num || 0).toLocaleString()}`
 
 export default function PolyEdgeScanner() {
+  // Env flag: set VITE_USE_REAL_DATA="true" to force live markets
+  const useRealDataEnv = import.meta.env.VITE_USE_REAL_DATA === 'true'
+
   const [simulationMode, setSimulationMode] = useState(false)
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -119,31 +143,25 @@ export default function PolyEdgeScanner() {
   const [oracleLoading, setOracleLoading] = useState(false)
   const [oraclePayload, setOraclePayload] = useState(null)
 
-  const fetchMarkets = async () => {
-    setLoading(true)
-    try {
-      const source = simulationMode ? generateMockMarkets() : await fetchLive()
-      setMarkets(source)
-    } catch {
-      setMarkets(generateMockMarkets())
-    }
-    setLastUpdated(new Date())
-    setLoading(false)
-  }
-
   const fetchLive = async () => {
     const res = await fetch('/api/gamma?active=true&limit=200')
     if (!res.ok) throw new Error('bad response')
+
     const payload = await res.json()
+
     return payload.map((m, idx) => {
       const price = Number(m.yes_price ?? m.price ?? 0.5)
       const volatility = (Math.sin(idx) + 1) / 40
       const liquidity = Number(m.liquidity ?? 60000 + Math.random() * 90000)
       const fundingRate = Number(((Math.random() - 0.5) / 25).toFixed(4))
       const whaleFlow = fundingRate < 0 ? 'buy' : Math.random() > 0.6 ? 'sell' : 'buy'
-      const whaleCount15m = Math.max(0, Math.round(Math.random() * 4 + (whaleFlow === 'buy' ? 1 : 0)))
+      const whaleCount15m = Math.max(
+        0,
+        Math.round(Math.random() * 4 + (whaleFlow === 'buy' ? 1 : 0)),
+      )
       const copyTraderCount = Math.round(10 + Math.random() * 30)
       const baseHistory = mockHistory(price + volatility)
+
       return {
         id: m.id,
         question: m.question ?? m.title ?? 'Unlabeled market',
@@ -154,26 +172,50 @@ export default function PolyEdgeScanner() {
         whaleFlow,
         whaleCount15m,
         copyTraderCount,
-        history: baseHistory
+        history: baseHistory,
       }
     })
+  }
+
+  const fetchMarkets = async () => {
+    setLoading(true)
+    try {
+      // If env forces live, always use live; otherwise respect Simulation toggle
+      const shouldUseLive = useRealDataEnv || !simulationMode
+      const source = shouldUseLive ? await fetchLive() : generateMockMarkets()
+      setMarkets(source)
+      console.info(
+        `Loaded ${source.length} ${shouldUseLive ? 'live' : 'simulated'} markets`,
+      )
+    } catch (error) {
+      console.error('Market fetch failed, using simulation fallback:', error.message)
+      setMarkets(generateMockMarkets())
+    }
+    setLastUpdated(new Date())
+    setLoading(false)
   }
 
   useEffect(() => {
     fetchMarkets()
     const interval = setInterval(fetchMarkets, 60000)
     return () => clearInterval(interval)
-  }, [simulationMode])
+  }, [simulationMode, useRealDataEnv])
 
-  const edges = useMemo(() => markets
-    .map((market) => ({ market, analysis: analyzeMarket(market) }))
-    .filter((item) => item.analysis.score >= 7.5)
-    .sort((a, b) => b.analysis.score - a.analysis.score)
-    .slice(0, 5), [markets])
+  const edges = useMemo(
+    () =>
+      markets
+        .map((market) => ({ market, analysis: analyzeMarket(market) }))
+        .filter((item) => item.analysis.score >= 7.5)
+        .sort((a, b) => b.analysis.score - a.analysis.score)
+        .slice(0, 5),
+    [markets],
+  )
 
   const headlineStats = useMemo(() => {
     const totalVolume = markets.reduce((acc, m) => acc + (m.volume24h || 0), 0)
-    const avgLiquidity = markets.length ? markets.reduce((acc, m) => acc + (m.liquidity || 0), 0) / markets.length : 0
+    const avgLiquidity = markets.length
+      ? markets.reduce((acc, m) => acc + (m.liquidity || 0), 0) / markets.length
+      : 0
     return { totalVolume, avgLiquidity }
   }, [markets])
 
@@ -208,11 +250,20 @@ export default function PolyEdgeScanner() {
             <Sparkles className="h-4 w-4" />
             Polymarket Edge Engine
           </div>
-          <h1 className="text-3xl font-semibold text-white sm:text-4xl">Brutal real-time market exploitation</h1>
-          <p className="text-slate-400 sm:text-lg">Live gamma feed, deterministic edge scoring, dual LLM oracle, and one-click copy intent. Built for ruthless execution.</p>
+          <h1 className="text-3xl font-semibold text-white sm:text-4xl">
+            Brutal real-time market exploitation
+          </h1>
+          <p className="text-slate-400 sm:text-lg">
+            Live gamma feed, deterministic edge scoring, dual LLM oracle, and one-click copy
+            intent. Built for ruthless execution.
+          </p>
           <div className="flex flex-wrap gap-2">
             {metricPill('Volume 24h', formatUsd(headlineStats.totalVolume), 'bg-emerald-400')}
-            {metricPill('Avg Liquidity', formatUsd(headlineStats.avgLiquidity), 'bg-indigo-400')}
+            {metricPill(
+              'Avg Liquidity',
+              formatUsd(headlineStats.avgLiquidity),
+              'bg-indigo-400',
+            )}
             {metricPill('Edge Threshold', '≥ 7.5', 'bg-fuchsia-400')}
           </div>
         </div>
@@ -225,7 +276,11 @@ export default function PolyEdgeScanner() {
               </div>
               <button
                 onClick={() => setSimulationMode(false)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${!simulationMode ? 'bg-emerald-500 text-night' : 'bg-white/5 text-slate-200'}`}
+                disabled={useRealDataEnv}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  !simulationMode ? 'bg-emerald-500 text-night' : 'bg-white/5 text-slate-200'
+                } ${useRealDataEnv ? 'opacity-70' : ''}`}
+                title={useRealDataEnv ? 'Live data enforced via env' : ''}
               >
                 Real
               </button>
@@ -237,7 +292,11 @@ export default function PolyEdgeScanner() {
               </div>
               <button
                 onClick={() => setSimulationMode(true)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${simulationMode ? 'bg-indigo-500 text-night' : 'bg-white/5 text-slate-200'}`}
+                disabled={useRealDataEnv}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  simulationMode ? 'bg-indigo-500 text-night' : 'bg-white/5 text-slate-200'
+                } ${useRealDataEnv ? 'opacity-70' : ''}`}
+                title={useRealDataEnv ? 'Live data enforced via env' : ''}
               >
                 Sim
               </button>
@@ -260,13 +319,20 @@ export default function PolyEdgeScanner() {
       </div>
 
       {loading ? (
-        <div className="glass flex items-center justify-center rounded-2xl border border-white/5 p-8 text-slate-200">Crunching order flow...</div>
+        <div className="glass flex items-center justify-center rounded-2xl border border-white/5 p-8 text-slate-200">
+          Crunching order flow...
+        </div>
       ) : edges.length === 0 ? (
-        <div className="glass rounded-2xl border border-white/5 p-8 text-center text-slate-200">No edges above threshold. Flip to simulation or wait for whales.</div>
+        <div className="glass rounded-2xl border border-white/5 p-8 text-center text-slate-200">
+          No edges above threshold. Flip to simulation or wait for whales.
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {edges.map(({ market, analysis }, idx) => (
-            <div key={market.id} className="glass gradient-border relative overflow-hidden rounded-2xl p-[1px]">
+            <div
+              key={market.id}
+              className="glass gradient-border relative overflow-hidden rounded-2xl p-[1px]"
+            >
               <div className="glass relative rounded-2xl p-6">
                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-indigo-500 to-fuchsia-500 opacity-60" />
                 <div className="flex items-start justify-between gap-4">
@@ -275,33 +341,61 @@ export default function PolyEdgeScanner() {
                       <Flame className="h-4 w-4" />
                       Edge {idx + 1}
                     </div>
-                    <h3 className="text-lg font-semibold text-white leading-tight">{market.question}</h3>
+                    <h3 className="text-lg font-semibold leading-tight text-white">
+                      {market.question}
+                    </h3>
                   </div>
-                  <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${gradientStops[idx % gradientStops.length]} opacity-80`}></div>
+                  <div
+                    className={`h-10 w-10 rounded-full bg-gradient-to-br ${
+                      gradientStops[idx % gradientStops.length]
+                    } opacity-80`}
+                  ></div>
                 </div>
 
                 <div className="mt-5 flex items-center justify-between">
                   <div>
-                    <p className="text-4xl font-bold text-white">{(market.price * 100).toFixed(1)}¢</p>
-                    <p className="text-xs text-slate-400">Score {analysis.score.toFixed(1)} / 10</p>
+                    <p className="text-4xl font-bold text-white">
+                      {(market.price * 100).toFixed(1)}¢
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Score {analysis.score.toFixed(1)} / 10
+                    </p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-right">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Signals</p>
-                    <p className="text-sm font-semibold text-emerald-200">{analysis.tags.slice(0, 2).join(' • ')}</p>
+                    <p className="text-sm font-semibold text-emerald-200">
+                      {analysis.tags.slice(0, 2).join(' • ')}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-4 h-28 w-full overflow-hidden rounded-xl border border-white/5 bg-night/60">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={market.history} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                    <AreaChart
+                      data={market.history}
+                      margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
+                    >
                       <defs>
                         <linearGradient id={`price-${market.id}`} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#34d399" stopOpacity={0.8} />
                           <stop offset="95%" stopColor="#6366f1" stopOpacity={0.15} />
                         </linearGradient>
                       </defs>
-                      <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: '#e2e8f0' }} />
-                      <Area type="monotone" dataKey="price" stroke="#34d399" fill={`url(#price-${market.id})`} strokeWidth={2} />
+                      <Tooltip
+                        contentStyle={{
+                          background: '#0f172a',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '12px',
+                          color: '#e2e8f0',
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="price"
+                        stroke="#34d399"
+                        fill={`url(#price-${market.id})`}
+                        strokeWidth={2}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -309,19 +403,31 @@ export default function PolyEdgeScanner() {
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-200">
                   <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
                     <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                    Liquidity <span className="ml-auto font-semibold text-white">{formatUsd(market.liquidity)}</span>
+                    Liquidity
+                    <span className="ml-auto font-semibold text-white">
+                      {formatUsd(market.liquidity)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
                     <TrendingUp className="h-4 w-4 text-indigo-300" />
-                    24h Vol <span className="ml-auto font-semibold text-white">{formatUsd(market.volume24h)}</span>
+                    24h Vol
+                    <span className="ml-auto font-semibold text-white">
+                      {formatUsd(market.volume24h)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
                     <BrainCircuit className="h-4 w-4 text-fuchsia-300" />
-                    Whales <span className="ml-auto font-semibold text-white">{market.whaleCount15m}</span>
+                    Whales
+                    <span className="ml-auto font-semibold text-white">
+                      {market.whaleCount15m}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
                     <Bot className="h-4 w-4 text-amber-300" />
-                    Copycats <span className="ml-auto font-semibold text-white">{market.copyTraderCount}</span>
+                    Copycats
+                    <span className="ml-auto font-semibold text-white">
+                      {market.copyTraderCount}
+                    </span>
                   </div>
                 </div>
 
@@ -353,10 +459,19 @@ export default function PolyEdgeScanner() {
           <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-night/95 p-6 shadow-glass">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-indigo-300">PolyEdge Oracle</p>
-                <h4 className="text-lg font-semibold text-white">{oraclePayload?.market?.question}</h4>
+                <p className="text-xs uppercase tracking-[0.2em] text-indigo-300">
+                  PolyEdge Oracle
+                </p>
+                <h4 className="text-lg font-semibold text-white">
+                  {oraclePayload?.market?.question}
+                </h4>
               </div>
-              <button onClick={() => setOracleOpen(false)} className="rounded-full border border-white/10 px-3 py-1 text-sm text-slate-300 hover:border-white/30">Close</button>
+              <button
+                onClick={() => setOracleOpen(false)}
+                className="rounded-full border border-white/10 px-3 py-1 text-sm text-slate-300 hover:border-white/30"
+              >
+                Close
+              </button>
             </div>
             {oracleLoading ? (
               <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-slate-200">
@@ -367,20 +482,36 @@ export default function PolyEdgeScanner() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3 text-sm text-slate-200">
                   <div className="rounded-xl border border-white/5 bg-white/5 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Direction</p>
-                    <p className="text-xl font-semibold text-emerald-300">{oraclePayload.verdict.direction}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Direction
+                    </p>
+                    <p className="text-xl font-semibold text-emerald-300">
+                      {oraclePayload.verdict.direction}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/5 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Conviction</p>
-                    <p className="text-xl font-semibold text-fuchsia-300">{oraclePayload.verdict.conviction}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Conviction
+                    </p>
+                    <p className="text-xl font-semibold text-fuchsia-300">
+                      {oraclePayload.verdict.conviction}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/5 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Target</p>
-                    <p className="text-xl font-semibold text-white">{(oraclePayload.verdict.targetPrice * 100).toFixed(1)}¢</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Target
+                    </p>
+                    <p className="text-xl font-semibold text-white">
+                      {(oraclePayload.verdict.targetPrice * 100).toFixed(1)}¢
+                    </p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/5 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Stop Loss</p>
-                    <p className="text-xl font-semibold text-white">{(oraclePayload.verdict.stopLoss * 100).toFixed(1)}¢</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Stop Loss
+                    </p>
+                    <p className="text-xl font-semibold text-white">
+                      {(oraclePayload.verdict.stopLoss * 100).toFixed(1)}¢
+                    </p>
                   </div>
                 </div>
                 <div className="rounded-xl border border-white/5 bg-white/5 p-4 text-sm text-slate-200">
@@ -389,17 +520,26 @@ export default function PolyEdgeScanner() {
                       <ShieldCheck className="h-4 w-4 text-emerald-300" />
                       Confidence
                     </span>
-                    <span className="text-lg font-semibold text-emerald-200">{oraclePayload.verdict.confidenceScore}%</span>
+                    <span className="text-lg font-semibold text-emerald-200">
+                      {oraclePayload.verdict.confidenceScore}%
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-2 text-slate-300">
                     {(oraclePayload.verdict.reasoning || []).map((line, i) => (
-                      <span key={i} className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">{line}</span>
+                      <span
+                        key={i}
+                        className="rounded-full bg-white/5 px-3 py-1 text-xs text-white"
+                      >
+                        {line}
+                      </span>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-white/5 bg-white/5 p-4 text-center text-slate-300">Oracle unavailable. Drop keys or retry.</div>
+              <div className="rounded-xl border border-white/5 bg-white/5 p-4 text-center text-slate-300">
+                Oracle unavailable. Drop keys or retry.
+              </div>
             )}
           </div>
         </div>
